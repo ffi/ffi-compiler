@@ -46,6 +46,17 @@ Example
 	  c.have_func?('puts')
 	  c.have_library?('z')
 	end
+
+###### example.gemspec
+	Gem::Specification.new do |s|
+      s.extensions << 'ext/mkrf_conf.rb'
+	  s.name = 'example'
+	  s.version = '0.0.1'
+	  s.email = 'ffi-example'
+	  s.files = %w(example.gemspec) + Dir.glob("{lib,spec,ext}/**/*")
+	  s.add_dependency 'rake'
+	  s.add_dependency 'ffi-compiler'
+	end
     
 ###### Build gem and install it
 	gem build example.gemspec && gem install example-0.0.1.gem

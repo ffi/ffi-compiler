@@ -1,8 +1,9 @@
 require 'ffi'
+require 'ffi-compiler/loader'
 
 module Example
   extend FFI::Library
-  ffi_lib File.join(File.dirname(__FILE__), '..', '..', 'ext', FFI.map_library_name('example'))
+  ffi_lib FFI::Compiler::Loader.find('example')
   attach_function :example, [], :long
 end
 

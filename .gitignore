@@ -9,6 +9,7 @@ pkg
 *.diff
 build
 *.so
+*.dylib
 *.[oa]
 core
 lib/ffi/types.conf

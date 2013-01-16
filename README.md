@@ -13,19 +13,17 @@ Example
 	      
 	ext
       |- example.c
-      |- mkrf_conf.rb
+      |- Rakefile
       
     example.gemspec
 
 ###### lib/example/example.rb
 	require 'ffi'
+	require 'ffi-compiler/loader'
 	
 	module Example
 	  extend FFI::Library
-	  
-	  # Project layout is with ruby files in lib/example/, C impl in ext/
-	  # Load the library by full path
-	  ffi_lib File.join('../../ext', FFI.map_library_name('example'))
+	  ffi_lib FFI::Compiler::Loader.find('example')
 	  
 	  # example function which takes no parameters and returns long
 	  attach_function :example, [], :long
@@ -38,10 +36,10 @@ Example
 	  return 0xdeadbeef;
 	}
 
-###### ext/mkrf_conf.rb
-	require 'ffi-compiler/mkrf'
+###### ext/Rakefile
+	require 'ffi-compiler/task'
 	
-	FFI::Compiler.new('example') do |c|
+	FFI::Compiler::Task.new('example') do |c|
 	  c.have_header?('stdio.h', '/usr/local/include')
 	  c.have_func?('puts')
 	  c.have_library?('z')
@@ -49,7 +47,7 @@ Example
 
 ###### example.gemspec
 	Gem::Specification.new do |s|
-      s.extensions << 'ext/mkrf_conf.rb'
+      s.extensions << 'ext/Rakefile'
 	  s.name = 'example'
 	  s.version = '0.0.1'
 	  s.email = 'ffi-example'

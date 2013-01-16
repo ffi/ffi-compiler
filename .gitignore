@@ -11,6 +11,7 @@ build
 *.so
 *.dylib
 *.[oa]
+*.gem
 core
 lib/ffi/types.conf
 lib/ffi_c.bundle

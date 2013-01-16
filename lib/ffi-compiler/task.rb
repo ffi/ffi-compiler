@@ -5,7 +5,12 @@ require 'tmpdir'
 
 module FFI
   class Compiler
+    DEFAULT_CFLAGS = %w(-fexceptions -O -fno-omit-frame-pointer -fno-strict-aliasing)
+    DEFAULT_LDFLAGS = %w(-fexceptions)
+    
     class Task < Rake::TaskLib
+      attr_reader :cflags, :cxxflags, :ldflags, :libs
+      
       def initialize(name)
         @name = name
         @defines = []
@@ -14,6 +19,10 @@ module FFI
         @libraries = []
         @headers = []
         @functions = []
+        @cflags = DEFAULT_CFLAGS.join(' ')
+        @cxxflags = DEFAULT_CFLAGS.join(' ')
+        @ldflags = DEFAULT_LDFLAGS.join(' ')
+        @libs = ''
 
         yield self if block_given?
         define_task!
@@ -49,7 +58,6 @@ module FFI
         lib_name = FFI.map_library_name(@name)
         pic_flags = '-fPIC'
         so_flags = ''
-        ld_flags = ''
         cc = 'cc'
         cxx = 'c++'
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }.join(' ')
@@ -58,21 +66,29 @@ module FFI
 
         if FFI::Platform.mac?
           pic_flags = ''
-          ld_flags += ' -dynamiclib '
+          so_flags += ' -dynamiclib '
 
         elsif FFI::Platform.name =~ /linux/
           so_flags += " -shared -Wl,-soname,#{lib_name} "
+        
+        else
+          so_flags += ' -shared'
         end
 
-        cflags = "#{pic_flags} #{iflags} #{defines}".strip
-        ld_flags += so_flags
-        ld_flags += @library_paths.map { |path| "-L#{path}" }.join(' ')
+        cflags = "#{@cflags} #{pic_flags} #{iflags} #{defines}".strip
+        cxxflags = "#{@cxxflags} #{pic_flags} #{iflags} #{defines}".strip
+        
+        ld_flags = @library_paths.map { |path| "-L#{path}" }.join(' ')
+        ld_flags << " #@ldflags" unless @ldflags.empty?
         ld_flags.strip!
-        ld = FileList['*.cpp'].empty? ? cc : cxx
-        cxxflags = cflags
-        libs = @libraries.map { |l| "-l#{l}" }.join(" ")
 
-        obj_files = FileList['*.c', '*.cpp'].map { |f| f.gsub(/\.(c|cpp)$/, '.o') }
+        libs = @libraries.map { |l| "-l#{l}" }.join(' ')
+        libs << " #@libs" unless @libs.empty?
+        libs.strip!
+
+        src_files = FileList['*.c', '*.cpp']
+        obj_files = src_files.map { |f| f.gsub(/\.(c|cpp)$/, '.o') }
+        ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
 
         CLEAN.include(obj_files)
 
@@ -88,7 +104,7 @@ module FFI
 
         desc "Compile to dynamic library"
         file lib_name => obj_files do |t|
-          sh "#{ld} #{ld_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{libs}"
+          sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"
         end
         CLEAN.include(lib_name)
 

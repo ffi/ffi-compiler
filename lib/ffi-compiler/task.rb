@@ -2,6 +2,7 @@ require 'rake/tasklib'
 require 'rake/clean'
 require 'ffi'
 require 'tmpdir'
+require 'rbconfig'
 
 module FFI
   class Compiler
@@ -58,8 +59,6 @@ module FFI
         lib_name = FFI.map_library_name(@name)
         pic_flags = '-fPIC'
         so_flags = ''
-        cc = 'cc'
-        cxx = 'c++'
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }.join(' ')
         defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }.join(' ')
         defines << " " + @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }.join(' ')
@@ -158,11 +157,19 @@ module FFI
             f << src
           end
           begin
-            return system "cc #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} >& /dev/null"
+            return system "#{cc} #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} >& /dev/null"
           rescue
             return false
           end
         end
+      end
+
+      def cc
+        ENV["CC"] || RbConfig::CONFIG["CC"] || "cc"
+      end
+
+      def cxx
+        ENV["CXX"] || RbConfig::CONFIG["CXX"] || "c++"
       end
     end
   end

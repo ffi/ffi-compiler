@@ -50,10 +50,6 @@ module FFI
         try_library(libname, @library_paths) || try_library(libname, paths)
       end
 
-      def create_rakefile!
-        create_rakefile(@name)
-      end
-
       private
       def define_task!
         lib_name = FFI.map_library_name(@name)

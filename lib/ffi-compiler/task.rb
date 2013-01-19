@@ -13,17 +13,17 @@ module FFI
       attr_reader :cflags, :cxxflags, :ldflags, :libs
       
       def initialize(name)
-        @name = name
+        @name = File.basename(name)
         @defines = []
         @include_paths = []
         @library_paths = []
         @libraries = []
         @headers = []
         @functions = []
-        @cflags = DEFAULT_CFLAGS.join(' ')
-        @cxxflags = DEFAULT_CFLAGS.join(' ')
-        @ldflags = DEFAULT_LDFLAGS.join(' ')
-        @libs = ''
+        @cflags = DEFAULT_CFLAGS.dup
+        @cxxflags = DEFAULT_CFLAGS.dup
+        @ldflags = DEFAULT_LDFLAGS.dup
+        @libs = []
 
         yield self if block_given?
         define_task!
@@ -52,52 +52,47 @@ module FFI
 
       private
       def define_task!
-        lib_name = FFI.map_library_name(@name)
-        pic_flags = '-fPIC'
-        so_flags = ''
-        iflags = @include_paths.uniq.map { |p| "-I#{p}" }.join(' ')
-        defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }.join(' ')
-        defines << " " + @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }.join(' ')
-
+        pic_flags = %w(-fPIC)
+        so_flags = []
+        
         if FFI::Platform.mac?
-          pic_flags = ''
-          so_flags += ' -dynamiclib '
+          pic_flags = []
+          so_flags << '-dynamiclib'
 
         elsif FFI::Platform.name =~ /linux/
-          so_flags += " -shared -Wl,-soname,#{lib_name} "
+          so_flags << "-shared -Wl,-soname,#{lib_name}"
         
         else
-          so_flags += ' -shared'
+          so_flags << '-shared'
         end
+        so_flags = so_flags.join(' ')
 
-        cflags = "#{@cflags} #{pic_flags} #{iflags} #{defines}".strip
-        cxxflags = "#{@cxxflags} #{pic_flags} #{iflags} #{defines}".strip
-        
-        ld_flags = @library_paths.map { |path| "-L#{path}" }.join(' ')
-        ld_flags << " #@ldflags" unless @ldflags.empty?
-        ld_flags.strip!
+        lib_name = FFI.map_library_name(@name)
 
-        libs = @libraries.map { |l| "-l#{l}" }.join(' ')
-        libs << " #@libs" unless @libs.empty?
-        libs.strip!
+        iflags = @include_paths.uniq.map { |p| "-I#{p}" }
+        defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
+        defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        src_files = FileList['*.c', '*.cpp']
-        obj_files = src_files.map { |f| f.gsub(/\.(c|cpp)$/, '.o') }
+        cflags = (@cflags + pic_flags + iflags + defines).join(' ')
+        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + defines).join(' ')
+        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
+        libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
+
+        src_files = FileList['*.{c,cpp}']
+        obj_files = src_files.ext '.o'
         ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
 
         CLEAN.include(obj_files)
 
-        desc "Compile C file to object file"
-        rule '.o' => ['.c'] do |t|
+        rule '.o' => '.c' do |t|
           sh "#{cc} #{cflags} -o #{t.name} -c #{t.source}"
         end
 
-        desc "Compile C++ file to object file"
-        rule '.o' => ['.cpp'] do |t|
+        rule '.o' => '.cpp' do |t|
           sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.source}"
         end
 
-        desc "Compile to dynamic library"
+        desc "Build dynamic library"
         file lib_name => obj_files do |t|
           sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"
         end
@@ -149,7 +144,7 @@ module FFI
       def try_compile(src, *opts)
         Dir.mktmpdir do |dir|
           path = File.join(dir, 'ffi-test.c')
-          File.open(path, "w") do |f|
+          File.open(path, 'w') do |f|
             f << src
           end
           begin
@@ -161,11 +156,11 @@ module FFI
       end
 
       def cc
-        ENV["CC"] || RbConfig::CONFIG["CC"] || "cc"
+        @cc ||= (ENV['CC'] || RbConfig::CONFIG['CC'] || 'cc')
       end
 
       def cxx
-        ENV["CXX"] || RbConfig::CONFIG["CXX"] || "c++"
+        @cxx ||= (ENV['CXX'] || RbConfig::CONFIG['CXX'] || 'c++')
       end
     end
   end

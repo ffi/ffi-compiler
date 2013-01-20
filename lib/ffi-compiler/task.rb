@@ -1,3 +1,4 @@
+require 'rake'
 require 'rake/tasklib'
 require 'rake/clean'
 require 'ffi'
@@ -15,6 +16,7 @@ module FFI
       
       def initialize(name)
         @name = File.basename(name)
+        @ext_dir = File.dirname(name)
         @defines = []
         @include_paths = []
         @library_paths = []
@@ -26,6 +28,7 @@ module FFI
         @ldflags = DEFAULT_LDFLAGS.dup
         @libs = []
         @platform = Platform.system
+        @exports = []
 
         yield self if block_given?
         define_task!
@@ -51,6 +54,10 @@ module FFI
       def have_library?(libname, *paths)
         try_library(libname, @library_paths) || try_library(libname, paths)
       end
+      
+      def export(rb_file)
+        @exports << { :rb_file => rb_file, :header => File.join(@ext_dir, File.basename(rb_file).sub(/\.rb$/, '.h')) }        
+      end
 
       private
       def define_task!
@@ -70,6 +77,10 @@ module FFI
         so_flags = so_flags.join(' ')
 
         out_dir = "#{@platform.arch}-#{@platform.os}"
+        if @ext_dir != '.'
+          out_dir = File.join(@ext_dir, out_dir)
+        end
+
         directory(out_dir)
         CLOBBER.include(out_dir)
         
@@ -84,18 +95,24 @@ module FFI
         ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
 
-        src_files = FileList['*.{c,cpp}']
-        obj_files = src_files.ext('.o').map { |f| File.join(out_dir, f) }
+        src_files = FileList["#{@ext_dir}/**/*.{c,cpp}"]
+        obj_files = src_files.ext('.o').map { |f| File.join(out_dir, f.sub(/^#{@ext_dir}\//, '')) }
         ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
 
-        CLEAN.include(obj_files)
-        
-        rule /\.o$/ => [lambda { |n| n.sub("#{out_dir}/", '').sub(/\.o$/, '.c')}, out_dir ] do |t|
-          sh "#{cc} #{cflags} -o #{t.name} -c #{t.source}"
-        end
-
-        rule /\.o$/ => [lambda { |n| n.sub("#{out_dir}/", '').sub(/\.o$/, '.cpp')}, out_dir ] do |t|
-          sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.source}"
+        src_files.each do |src|
+          obj_file = File.join(out_dir, src.sub(/\.(c|cpp)$/, '.o').sub(/^#{@ext_dir}\//, ''))
+          if src =~ /\.c$/
+            file obj_file => [ src, File.dirname(obj_file) ] do |t|
+              sh "#{cc} #{cflags} -o #{t.name} -c #{t.prerequisites[0]}"
+            end
+          
+          else
+            file obj_file => [ src, File.dirname(obj_file) ] do |t|
+              sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.prerequisites[0]}"
+            end
+          end
+          
+          CLEAN.include(obj_file)
         end
 
         desc "Build dynamic library"
@@ -104,7 +121,21 @@ module FFI
         end
         CLEAN.include(lib_name)
 
+        @exports.each do |e|
+          desc "Export #{e[:rb_file]}"
+          file e[:header] => [ e[:rb_file] ] do |t|
+            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
+          end
+
+          obj_files.each { |o| file o  => [ e[:header] ] }
+          CLEAN.include(e[:header])
+
+          desc "Export API headers"
+          task :api_headers => [ e[:header] ]
+        end
+
         task :default => [ lib_name ]
+        task :package => [ :api_headers ]
       end
 
       def try_header(header, paths)

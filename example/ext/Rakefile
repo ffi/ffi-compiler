@@ -1,9 +1,0 @@
-require 'ffi-compiler/task'
-
-FFI::Compiler::Task.new('example') do |t|
-  t.have_header?('stdio.h', '/usr/local/include')
-  t.have_func?('puts')
-  t.have_library?('z')
-  t.cflags << "-arch x86_64 -arch i386" if FFI::Platform.mac?
-  t.ldflags << "-arch x86_64 -arch i386" if FFI::Platform.mac?
-end

@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.has_rdoc = false
   s.license = 'unknown'
   s.required_ruby_version = '>= 1.9.3'
-  s.extensions << 'ext/Rakefile'
+  s.extensions << 'Rakefile'
   s.add_dependency 'rake'
   s.add_dependency 'ffi-compiler', '>= 0.0.2'
   s.add_development_dependency 'rspec'

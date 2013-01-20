@@ -1,14 +1,15 @@
 require 'pathname'
 require 'ffi'
+require_relative 'platform'
 
 module FFI
   module Compiler
     module Loader
       def self.find(name, start_path = nil)
-        library = FFI.map_library_name(name)
+        library = Platform.system.map_library_name(name)
         root = false
         Pathname.new(start_path || File.dirname(caller[0].split(/:/)[0])).ascend do |path|
-          Dir.glob("#{path}/**/#{library}") do |f|
+          Dir.glob("#{path}/**/{#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library},#{library}}") do |f|
             return f
           end
 

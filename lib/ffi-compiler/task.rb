@@ -3,9 +3,10 @@ require 'rake/clean'
 require 'ffi'
 require 'tmpdir'
 require 'rbconfig'
+require_relative 'platform'
 
 module FFI
-  class Compiler
+  module Compiler
     DEFAULT_CFLAGS = %w(-fexceptions -O -fno-omit-frame-pointer -fno-strict-aliasing)
     DEFAULT_LDFLAGS = %w(-fexceptions)
     
@@ -24,6 +25,7 @@ module FFI
         @cxxflags = DEFAULT_CFLAGS.dup
         @ldflags = DEFAULT_LDFLAGS.dup
         @libs = []
+        @platform = Platform.system
 
         yield self if block_given?
         define_task!
@@ -55,11 +57,11 @@ module FFI
         pic_flags = %w(-fPIC)
         so_flags = []
         
-        if FFI::Platform.mac?
+        if @platform.mac?
           pic_flags = []
-          so_flags << '-dynamiclib'
+          so_flags << '-bundle'
 
-        elsif FFI::Platform.name =~ /linux/
+        elsif @platform.name =~ /linux/
           so_flags << "-shared -Wl,-soname,#{lib_name}"
         
         else
@@ -67,7 +69,11 @@ module FFI
         end
         so_flags = so_flags.join(' ')
 
-        lib_name = FFI.map_library_name(@name)
+        out_dir = "#{@platform.arch}-#{@platform.os}"
+        directory(out_dir)
+        CLOBBER.include(out_dir)
+        
+        lib_name = File.join(out_dir, Platform.system.map_library_name(@name))
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
         defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
@@ -79,16 +85,16 @@ module FFI
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
 
         src_files = FileList['*.{c,cpp}']
-        obj_files = src_files.ext '.o'
+        obj_files = src_files.ext('.o').map { |f| File.join(out_dir, f) }
         ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
 
         CLEAN.include(obj_files)
-
-        rule '.o' => '.c' do |t|
+        
+        rule /\.o$/ => [lambda { |n| n.sub("#{out_dir}/", '').sub(/\.o$/, '.c')}, out_dir ] do |t|
           sh "#{cc} #{cflags} -o #{t.name} -c #{t.source}"
         end
 
-        rule '.o' => '.cpp' do |t|
+        rule /\.o$/ => [lambda { |n| n.sub("#{out_dir}/", '').sub(/\.o$/, '.cpp')}, out_dir ] do |t|
           sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.source}"
         end
 

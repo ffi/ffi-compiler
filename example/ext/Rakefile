@@ -1,6 +1,6 @@
-require 'ffi-compiler/task'
+require 'ffi-compiler/compile_task'
 
-FFI::Compiler::Task.new('example') do |t|
+FFI::Compiler::CompileTask.new('example') do |t|
   t.have_header?('stdio.h', '/usr/local/include')
   t.have_func?('puts')
   t.have_library?('z')

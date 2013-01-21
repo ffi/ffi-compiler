@@ -1,6 +1,6 @@
 require 'rubygems'
 require 'rubygems/package_task'
-require 'ffi-compiler/task'
+require 'ffi-compiler/export_task'
 
 def gem_spec
   @gem_spec ||= Gem::Specification.load('example.gemspec')
@@ -12,11 +12,6 @@ Gem::PackageTask.new(gem_spec) do |pkg|
   pkg.package_dir = 'pkg'
 end
 
-FFI::Compiler::Task.new('ext/example') do |t|
-  t.have_header?('stdio.h', '/usr/local/include')
-  t.have_func?('puts')
-  t.have_library?('z')
-  t.cflags << "-arch x86_64 -arch i386" if FFI::Platform.mac?
-  t.ldflags << "-arch x86_64 -arch i386" if FFI::Platform.mac?
-  t.export 'lib/example/example.rb'
+FFI::Compiler::ExportTask.new('lib/example', 'ext') do |t|
+  t.export 'example.rb'
 end

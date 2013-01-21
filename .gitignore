@@ -18,3 +18,4 @@ lib/ffi_c.bundle
 lib/ffi_c.so
 .idea
 *.iml
+/example/ext/example.h

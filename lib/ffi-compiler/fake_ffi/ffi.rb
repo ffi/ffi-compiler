@@ -74,7 +74,7 @@ module FFI
     
     def dump(out_file)
       File.open(out_file, 'w') do |f|
-        guard = out_file.upcase.sub('.', '_').sub('/', '_')
+        guard = File.basename(out_file).upcase.gsub('.', '_').gsub('/', '_')
         f.puts <<-HEADER
 #ifndef #{guard}
 #define #{guard} 1

@@ -12,7 +12,7 @@ module FFI
     DEFAULT_LDFLAGS = %w(-fexceptions)
     
     class Task < Rake::TaskLib
-      attr_reader :cflags, :cxxflags, :ldflags, :libs
+      attr_reader :cflags, :cxxflags, :ldflags, :libs, :platform
       
       def initialize(name)
         @name = File.basename(name)

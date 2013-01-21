@@ -33,13 +33,13 @@ Example
 	long
 	example(void)
 	{
-	  return 0xdeadbeef;
+	    return 0xdeadbeef;
 	}
 
 ###### ext/Rakefile
-	require 'ffi-compiler/task'
+	require 'ffi-compiler/compile_task'
 	
-	FFI::Compiler::Task.new('example') do |c|
+	FFI::Compiler::CompileTask.new('example') do |c|
 	  c.have_header?('stdio.h', '/usr/local/include')
 	  c.have_func?('puts')
 	  c.have_library?('z')

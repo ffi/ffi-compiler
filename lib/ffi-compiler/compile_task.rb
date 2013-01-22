@@ -52,7 +52,15 @@ module FFI
       end
 
       def have_library?(libname, *paths)
-        try_library(libname, @library_paths) || try_library(libname, paths)
+        try_library(libname, paths: @library_paths) || try_library(libname, paths: paths)
+      end
+      
+      def have_library(lib, func = nil, headers = nil, &b)
+        try_library(lib, function: func, headers: headers, paths: @library_paths)
+      end
+      
+      def find_library(lib, func, *paths)
+        try_library(lib, function: func, paths: @library_paths) || try_library(libname, function: func, paths: paths)
       end
 
       def export(rb_file)
@@ -160,9 +168,13 @@ module FFI
       end
 
 
-      def try_library(libname, paths)
+      def try_library(libname, options = {})
+        func = options[:function] || 'main'
+        paths = options[:paths] || ''
         main = <<-C_FILE
-        int main(int argc, char **argv) { return 0; }
+        #{(options[:headers] || []).map {|h| "#include <#{h}>"}.join('\n')}
+        extern int #{func}();
+        int main() { return #{func}(); }
         C_FILE
 
         if paths.empty? && try_compile(main)

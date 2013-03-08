@@ -197,7 +197,7 @@ module FFI
             f << src
           end
           begin
-            return system "#{cc} #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} >/dev/null 2>&1"
+            return system "#{cc} #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} > /dev/null 2>&1"
           rescue
             return false
           end

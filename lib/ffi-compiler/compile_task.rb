@@ -123,6 +123,9 @@ module FFI
           CLEAN.include(obj_file)
         end
 
+        # create all the directories for the output files
+        obj_files.map { |f| File.dirname(f) }.sort.uniq.map { |d| directory d }
+
         desc "Build dynamic library"
         file lib_name => obj_files do |t|
           sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"

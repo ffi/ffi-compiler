@@ -34,6 +34,14 @@ module FFI
         define_task!
       end
 
+      def add_include_path(path)
+        @include_paths << path
+      end
+
+      def add_define(name, value=1)
+        @defines << "-D#{name}=#{value}"
+      end
+
       def have_func?(func)
         main = <<-C_FILE
         extern void #{func}();
@@ -95,11 +103,11 @@ module FFI
         lib_name = File.join(out_dir, Platform.system.map_library_name(@name))
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
-        defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
-        defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
+        @defines << @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
+        @defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        cflags = (@cflags + pic_flags + iflags + defines).join(' ')
-        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + defines).join(' ')
+        cflags = (@cflags + pic_flags + iflags + @defines).join(' ')
+        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + @defines).join(' ')
         ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
 

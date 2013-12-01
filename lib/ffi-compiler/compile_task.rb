@@ -207,8 +207,10 @@ module FFI
           File.open(path, 'w') do |f|
             f << src
           end
+          cflags = opts.join(' ')
+          output = File.join(dir, 'ffi-test')
           begin
-            return system "#{cc} #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} > /dev/null 2>&1"
+            return system "#{cc} #{cflags} -o #{output} -c #{path} > #{path}.log 2>&1"
           rescue
             return false
           end

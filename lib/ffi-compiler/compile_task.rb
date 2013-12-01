@@ -143,7 +143,7 @@ module FFI
         @exports.each do |e|
           desc "Export #{e[:rb_file]}"
           file e[:header] => [ e[:rb_file] ] do |t|
-            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
+            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} -I#{File.dirname(t.prerequisites[0])} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
           end
 
           obj_files.each { |o| file o  => [ e[:header] ] }

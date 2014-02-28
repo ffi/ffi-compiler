@@ -13,12 +13,13 @@ module FFI
 
     class CompileTask < Rake::TaskLib
       attr_reader :cflags, :cxxflags, :ldflags, :libs, :platform
-      attr_accessor :ext_dir, :source_dir
+      attr_accessor :name, :ext_dir, :source_dirs, :exclude
 
       def initialize(name)
         @name = File.basename(name)
         @ext_dir = File.dirname(name)
-        @source_dir = @ext_dir
+        @source_dirs = [@ext_dir]
+        @exclude = []
         @defines = []
         @include_paths = []
         @library_paths = []
@@ -113,12 +114,20 @@ module FFI
         ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
 
-        src_files = FileList["#{@source_dir}/**/*.{c,cpp}"]
-        obj_files = src_files.ext('.o').map { |f| File.join(out_dir, f.sub(/^#{@source_dir}\//, '')) }
-        ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
+        src_files = []
+        obj_files = []
+        @source_dirs.each do |dir|
+          files = FileList["#{dir}/**/*.{c,cpp}"]
+	  unless @exclude.empty?
+	    files.delete_if { |f| f =~ Regexp.union(*@exclude) }
+	  end
+          src_files += files
+          obj_files += files.ext('.o').map { |f| File.join(out_dir, f.sub(/^#{dir}\//, '')) }
+	end
 
+        index = 0
         src_files.each do |src|
-          obj_file = File.join(out_dir, src.sub(/\.(c|cpp)$/, '.o').sub(/^#{@source_dir}\//, ''))
+          obj_file = obj_files[index]
           if src =~ /\.c$/
             file obj_file => [ src, File.dirname(obj_file) ] do |t|
               sh "#{cc} #{cflags} -o #{t.name} -c #{t.prerequisites[0]}"
@@ -131,7 +140,10 @@ module FFI
           end
 
           CLEAN.include(obj_file)
+          index += 1
         end
+
+        ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
 
         # create all the directories for the output files
         obj_files.map { |f| File.dirname(f) }.sort.uniq.map { |d| directory d }

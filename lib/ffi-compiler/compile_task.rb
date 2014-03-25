@@ -34,6 +34,14 @@ module FFI
         define_task!
       end
 
+      def add_include_path(path)
+        @include_paths << path
+      end
+
+      def add_define(name, value=1)
+        @defines << "-D#{name}=#{value}"
+      end
+
       def have_func?(func)
         main = <<-C_FILE
         extern void #{func}();
@@ -95,11 +103,11 @@ module FFI
         lib_name = File.join(out_dir, Platform.system.map_library_name(@name))
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
-        defines = @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
-        defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
+        @defines << @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
+        @defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        cflags = (@cflags + pic_flags + iflags + defines).join(' ')
-        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + defines).join(' ')
+        cflags = (@cflags + pic_flags + iflags + @defines).join(' ')
+        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + @defines).join(' ')
         ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
 
@@ -135,7 +143,7 @@ module FFI
         @exports.each do |e|
           desc "Export #{e[:rb_file]}"
           file e[:header] => [ e[:rb_file] ] do |t|
-            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
+            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} -I#{File.dirname(t.prerequisites[0])} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
           end
 
           obj_files.each { |o| file o  => [ e[:header] ] }
@@ -199,8 +207,10 @@ module FFI
           File.open(path, 'w') do |f|
             f << src
           end
+          cflags = opts.join(' ')
+          output = File.join(dir, 'ffi-test')
           begin
-            return system "#{cc} #{opts.join(' ')} -o #{File.join(dir, 'ffi-test')} #{path} > /dev/null 2>&1"
+            return system "#{cc} #{cflags} -o #{output} -c #{path} > #{path}.log 2>&1"
           rescue
             return false
           end

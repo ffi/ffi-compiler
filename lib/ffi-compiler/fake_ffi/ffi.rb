@@ -3,11 +3,11 @@ module FFI
   def self.exporter=(exporter)
     @@exporter = exporter
   end
-  
+
   def self.exporter
-    @@exporter
+    @@exporter ||= Exporter.new(nil)
   end
-  
+
   class Type
     attr_reader :name
     def initialize(name)
@@ -26,8 +26,28 @@ module FFI
       super("struct #{struct_class.to_s.gsub('::', '_')}")
     end
   end
-  
+
+  class CallbackInfo
+    attr_reader :return_type
+    attr_reader :arg_types
+    attr_reader :options
+
+    def initialize(return_type, arg_types = [], *other)
+      @return_type = return_type
+      @arg_types = arg_types
+      @options = options
+    end
+
+    def name(name)
+      params = @arg_types.empty? ? 'void' : @arg_types.map(&:name).join(', ')
+      "#{@return_type.name} (*#{name})(#{params})"
+    end
+  end
+
   PrimitiveTypes = {
+      :void => 'void',
+      :bool => 'bool',
+      :string => 'const char *',
       :char => 'char',
       :uchar => 'unsigned char',
       :short => 'short',
@@ -36,15 +56,29 @@ module FFI
       :uint => 'unsigned int',
       :long => 'long',
       :ulong => 'unsigned long',
+      :long_long => 'long long',
+      :ulong_long => 'unsigned long long',
       :float => 'float',
       :double => 'double',
+      :long_double => 'long double',
       :pointer => 'void *',
-      :string => 'const char *',
+      :int8 => 'int8_t',
+      :uint8 => 'uint8_t',
+      :int16 => 'int16_t',
+      :uint16 => 'uint16_t',
+      :int32 => 'int32_t',
+      :uint32 => 'uint32_t',
+      :int64 => 'int64_t',
+      :uint64 => 'uint64_t',
+      :buffer_in => 'const in void *',
+      :buffer_out => 'out void *',
+      :buffer_inout => 'inout void *',
+      :varargs => '...'
   }
-  
+
   TypeMap = {}
   def self.find_type(type)
-    return type if type.is_a?(Type)
+    return type if type.is_a?(Type) or type.is_a?(CallbackInfo)
 
     t = TypeMap[type]
     return t unless t.nil?
@@ -55,12 +89,19 @@ module FFI
     raise TypeError.new("cannot resolve type #{type}")
   end
 
+  class Function
+    def initialize(*args)
+    end
+  end
+
   class Exporter
-    attr_reader :mod, :functions
+    attr_accessor :mod
+    attr_reader :functions, :callbacks, :structs
 
     def initialize(mod)
       @mod = mod
       @functions = []
+      @callbacks = {}
       @structs = []
     end
 
@@ -71,7 +112,11 @@ module FFI
     def struct(name, fields)
       @structs << { name: name, fields: fields.dup }
     end
-    
+
+    def callback(name, cb)
+      @callbacks[name] = cb
+    end
+
     def dump(out_file)
       File.open(out_file, 'w') do |f|
         guard = File.basename(out_file).upcase.gsub('.', '_').gsub('/', '_')
@@ -88,11 +133,19 @@ module FFI
 #endif
 
         HEADER
-        
+
+        @callbacks.each do |name, cb|
+          f.puts "typedef #{cb.name(name)};"
+        end
         @structs.each do |s|
           f.puts "struct #{s[:name].gsub('::', '_')} {"
           s[:fields].each do |field|
-            f.puts "#{' ' * 4}#{field[:type].name} #{field[:name].to_s};"
+            if field[:type].is_a?(CallbackInfo)
+              type = field[:type].name(field[:name].to_s)
+            else
+              type = "#{field[:type].name} #{field[:name].to_s}"
+            end
+            f.puts "#{' ' * 4}#{type};"
           end
           f.puts '};'
           f.puts
@@ -112,15 +165,29 @@ module FFI
 
   module Library
     def self.extended(mod)
-      FFI.exporter = Exporter.new(mod)
+      FFI.exporter.mod = mod
     end
 
-    def attach_function(*args)
-      FFI.exporter.attach(args[0], args[0], find_type(args[2]), args[1].map { |t| find_type(t) })
+    def attach_function(name, func, args, returns = nil, options = nil)
+      mname, a2, a3, a4, a5 = name, func, args, returns, options
+      cname, arg_types, ret_type, opts = (a4 && (a2.is_a?(String) || a2.is_a?(Symbol))) ? [ a2, a3, a4, a5 ] : [ mname.to_s, a2, a3, a4 ]
+      arg_types = arg_types.map { |e| find_type(e) }
+      FFI.exporter.attach(mname, cname, find_type(ret_type), arg_types)
     end
 
     def ffi_lib(*args)
 
+    end
+
+    def callback(*args)
+      name, params, ret = if args.length == 3
+        args
+      else
+        [ nil, args[0], args[1] ]
+      end
+      native_params = params.map { |e| find_type(e) }
+      cb = FFI::CallbackInfo.new(find_type(ret), native_params)
+      FFI.exporter.callback(name, cb) if name
     end
 
     TypeMap = {}
@@ -138,13 +205,41 @@ module FFI
 
   class Struct
     def self.layout(*args)
+      return if args.size.zero?
       fields = []
-      i = 0
-      while i < args.length
-        fields << { name: args[i], type: find_type(args[i+1]) }
-        i += 2
+      if args.first.kind_of?(Hash)
+        args.first.each do |name, type|
+          fields << { :name => name, :type => find_type(type), :offset => nil }
+        end
+      else
+        i = 0
+        while i < args.size
+          name, type, offset = args[i], args[i+1], nil
+          i += 2
+          if args[i].kind_of?(Integer)
+            offset = args[i]
+            i += 1
+          end
+          fields << { :name => name, :type => find_type(type), :offset => offset }
+        end
       end
       FFI.exporter.struct(self.to_s, fields)
+    end
+
+    def initialize
+      @data = {}
+    end
+
+    def [](name)
+      @data[name]
+    end
+
+    def []=(name, value)
+      @data[name] = value
+    end
+
+    def self.callback(params, ret)
+      FFI::CallbackInfo.new(find_type(ret), params.map { |e| find_type(e) })
     end
 
     TypeMap = {}
@@ -158,13 +253,30 @@ module FFI
 
       TypeMap[type] = FFI.find_type(type)
     end
-    
-    def self.by_value
-      StructByValue.new(self)
+
+    def self.in
+      ptr(:in)
     end
-    
-    def self.by_ref
+
+    def self.out
+      ptr(:out)
+    end
+
+    def self.ptr(flags = :inout)
       StructByReference.new(self)
     end
+
+    def self.val
+      StructByValue.new(self)
+    end
+
+    def self.by_value
+      self.val
+    end
+
+    def self.by_ref(flags = :inout)
+      self.ptr(flags)
+    end
+
   end
 end

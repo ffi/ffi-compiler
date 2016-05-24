@@ -19,3 +19,5 @@ lib/ffi_c.so
 .idea
 *.iml
 /example/ext/example.h
+Gemfile.lock
+

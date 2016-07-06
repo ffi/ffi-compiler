@@ -1,12 +1,12 @@
 Gem::Specification.new do |s|
   s.name = 'ffi-compiler'
-  s.version = '0.1.3'
+  s.version = '1.0.0'
   s.author = 'Wayne Meissner'
   s.email = 'wmeissner@gmail.com'
   s.homepage = 'http://wiki.github.com/ffi/ffi'
   s.summary = 'Ruby FFI Rakefile generator'
   s.description = 'Ruby FFI library'
-  s.files = %w(ffi-compiler.gemspec README.md Rakefile LICENSE) + Dir.glob("{lib,spec}/**/*")
+  s.files = %w(ffi-compiler.gemspec Gemfile Rakefile README.md LICENSE) + Dir.glob("{lib,spec}/**/*")
   s.has_rdoc = false
   s.license = 'Apache 2.0'
   s.required_ruby_version = '>= 1.9'

@@ -65,11 +65,11 @@ module FFI
       def have_library?(libname, *paths)
         try_library(libname, paths: @library_paths) || try_library(libname, paths: paths)
       end
-      
+
       def have_library(lib, func = nil, headers = nil, &b)
         try_library(lib, function: func, headers: headers, paths: @library_paths)
       end
-      
+
       def find_library(lib, func, *paths)
         try_library(lib, function: func, paths: @library_paths) || try_library(libname, function: func, paths: paths)
       end
@@ -117,7 +117,7 @@ module FFI
         src_files = []
         obj_files = []
         @source_dirs.each do |dir|
-          files = FileList["#{dir}/**/*.{c,cpp}"]
+          files = FileList["#{dir}/**/*.{c,cpp,go}"]
 	  unless @exclude.empty?
 	    files.delete_if { |f| f =~ Regexp.union(*@exclude) }
 	  end
@@ -133,6 +133,11 @@ module FFI
               sh "#{cc} #{cflags} -o #{t.name} -c #{t.prerequisites[0]}"
             end
 
+          elsif src =~ /\.go$/
+            file obj_file => [ src, File.dirname(obj_file) ] do |t|
+              sh "#{go} build -buildmode=c-shared -o #{t.name} #{t.prerequisites[0]}"
+            end
+
           else
             file obj_file => [ src, File.dirname(obj_file) ] do |t|
               sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.prerequisites[0]}"
@@ -143,14 +148,25 @@ module FFI
           index += 1
         end
 
-        ld = src_files.detect { |f| f =~ /\.cpp$/ } ? cxx : cc
+        ld = if src_files.detect { |f| f =~ /\.cpp$/ }
+               cxx
+             elsif src_files.detect { |f| f =~ /\.c$/ }
+               cc
+             else
+               go
+             end
 
         # create all the directories for the output files
         obj_files.map { |f| File.dirname(f) }.sort.uniq.map { |d| directory d }
 
         desc "Build dynamic library"
         file lib_name => obj_files do |t|
-          sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"
+          if ld == cxx || ld == cc
+            sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"
+          else
+            # this is a go library, which is already a shared C lib; copy it into place
+            sh "cp #{t.prerequisites[0]} #{t.name}"
+          end
         end
         CLEAN.include(lib_name)
 
@@ -237,6 +253,10 @@ module FFI
 
       def cxx
         @cxx ||= (ENV['CXX'] || RbConfig::CONFIG['CXX'] || 'c++')
+      end
+
+      def go
+        @go ||= (ENV['GO'] || RbConfig::CONFIG['GO'] || 'go')
       end
     end
   end

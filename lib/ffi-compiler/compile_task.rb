@@ -118,12 +118,12 @@ module FFI
         obj_files = []
         @source_dirs.each do |dir|
           files = FileList["#{dir}/**/*.{c,cpp}"]
-	  unless @exclude.empty?
-	    files.delete_if { |f| f =~ Regexp.union(*@exclude) }
-	  end
+          unless @exclude.empty?
+            files.delete_if { |f| f =~ Regexp.union(*@exclude) }
+          end
           src_files += files
           obj_files += files.ext('.o').map { |f| File.join(out_dir, f.sub(/^#{dir}\//, '')) }
-	end
+        end
 
         index = 0
         src_files.each do |src|

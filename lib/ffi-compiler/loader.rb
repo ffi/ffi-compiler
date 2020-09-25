@@ -9,7 +9,11 @@ module FFI
         library = Platform.system.map_library_name(name)
         root = false
         Pathname.new(start_path || caller_path(caller[0])).ascend do |path|
-          Dir.glob("#{path}/**/{#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library},#{library}}") do |f|
+          Dir.glob("#{path}/**/#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library}") do |f|
+            return f
+          end
+
+          Dir.glob("#{path}/**/#{library}") do |f|
             return f
           end
 

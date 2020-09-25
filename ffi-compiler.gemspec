@@ -9,7 +9,6 @@ Gem::Specification.new do |s|
   s.summary = 'Ruby FFI Rakefile generator'
   s.description = 'Ruby FFI library'
   s.files = %w(ffi-compiler.gemspec Gemfile Rakefile README.md LICENSE) + Dir.glob("{lib,spec}/**/*")
-  s.has_rdoc = false
   s.license = 'Apache 2.0'
   s.required_ruby_version = '>= 1.9'
   s.add_dependency 'rake'

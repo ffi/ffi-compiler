@@ -27,9 +27,9 @@ module FFI
         @libraries = []
         @headers = []
         @functions = []
-        @cflags = DEFAULT_CFLAGS.dup
-        @cxxflags = DEFAULT_CFLAGS.dup
-        @ldflags = DEFAULT_LDFLAGS.dup
+        @cflags = ENV['CFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup
+        @cxxflags = ENV['CXXFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup
+        @ldflags = ENV['LDFLAGS']&.shellsplit || DEFAULT_LDFLAGS.dup
         @libs = []
         @platform = Platform.system
         @exports = []

@@ -2,6 +2,7 @@ require 'rake'
 require 'rake/tasklib'
 require 'rake/clean'
 require 'ffi'
+require 'shellwords'
 require 'tmpdir'
 require 'rbconfig'
 require_relative 'platform'
@@ -93,7 +94,7 @@ module FFI
         else
           so_flags << '-shared'
         end
-        so_flags = so_flags.join(' ')
+        so_flags = so_flags.shelljoin
 
         out_dir = "#{@platform.arch}-#{@platform.os}"
         if @ext_dir != '.'
@@ -106,13 +107,13 @@ module FFI
         lib_name = File.join(out_dir, Platform.system.map_library_name(@name))
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
-        @defines << @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
-        @defines << @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
+        @defines += @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
+        @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        cflags = (@cflags + pic_flags + iflags + @defines).join(' ')
-        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + @defines).join(' ')
-        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).join(' ')
-        libs = (@libraries.map { |l| "-l#{l}" } + @libs).join(' ')
+        cflags = (@cflags + pic_flags + iflags + @defines).shelljoin
+        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + @defines).shelljoin
+        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).shelljoin
+        libs = (@libraries.map { |l| "-l#{l}" } + @libs).shelljoin
 
         src_files = []
         obj_files = []
@@ -150,7 +151,7 @@ module FFI
 
         desc "Build dynamic library"
         file lib_name => obj_files do |t|
-          sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.join(' ')} #{ld_flags} #{libs}"
+          sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.shelljoin} #{ld_flags} #{libs}"
         end
         CLEAN.include(lib_name)
 
@@ -221,7 +222,7 @@ module FFI
           File.open(path, 'w') do |f|
             f << src
           end
-          cflags = opts.join(' ')
+          cflags = opts.shelljoin
           output = File.join(dir, 'ffi-test')
           begin
             return system "#{cc} #{cflags} -o #{output} -c #{path} > #{path}.log 2>&1"

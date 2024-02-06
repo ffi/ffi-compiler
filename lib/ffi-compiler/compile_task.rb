@@ -12,6 +12,31 @@ module FFI
     DEFAULT_CFLAGS = %w(-fexceptions -O -fno-omit-frame-pointer -fno-strict-aliasing)
     DEFAULT_LDFLAGS = %w(-fexceptions)
 
+    class Flags
+      attr_accessor :raw
+
+        def initialize(flags)
+          @flags = flags
+          @raw = true # For backward compatibility
+        end
+
+        def <<(flag)
+          if @raw
+            @flags += flag.to_s.shellsplit
+          else
+            @flags << flag
+          end
+        end
+
+        def to_a
+          @flags
+        end
+
+        def to_s
+          @flags.shelljoin
+        end
+    end
+
     class CompileTask < Rake::TaskLib
       attr_reader :cflags, :cxxflags, :ldflags, :libs, :platform
       attr_accessor :name, :ext_dir, :source_dirs, :exclude
@@ -27,9 +52,9 @@ module FFI
         @libraries = []
         @headers = []
         @functions = []
-        @cflags = ENV['CFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup
-        @cxxflags = ENV['CXXFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup
-        @ldflags = ENV['LDFLAGS']&.shellsplit || DEFAULT_LDFLAGS.dup
+        @cflags = Flags.new(ENV['CFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup)
+        @cxxflags = Flags.new(ENV['CXXFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup)
+        @ldflags = Flags.new(ENV['LDFLAGS']&.shellsplit || DEFAULT_LDFLAGS.dup)
         @libs = []
         @platform = Platform.system
         @exports = []
@@ -110,9 +135,9 @@ module FFI
         @defines += @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
         @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        cflags = (@cflags + pic_flags + iflags + @defines).shelljoin
-        cxxflags = (@cxxflags + @cflags + pic_flags + iflags + @defines).shelljoin
-        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags).shelljoin
+        cflags = (@cflags.to_a + pic_flags + iflags + @defines).shelljoin
+        cxxflags = (@cxxflags.to_a + @cflags.to_a + pic_flags + iflags + @defines).shelljoin
+        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags.to_a).shelljoin
         libs = (@libraries.map { |l| "-l#{l}" } + @libs).shelljoin
 
         src_files = []

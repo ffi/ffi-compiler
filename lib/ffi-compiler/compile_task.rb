@@ -2,10 +2,10 @@ require 'rake'
 require 'rake/tasklib'
 require 'rake/clean'
 require 'ffi'
-require 'shellwords'
 require 'tmpdir'
 require 'rbconfig'
 require_relative 'platform'
+require_relative 'shell'
 
 module FFI
   module Compiler
@@ -22,7 +22,7 @@ module FFI
 
         def <<(flag)
           if @raw
-            @flags += flag.to_s.shellsplit
+            @flags += shellsplit(flag.to_s)
           else
             @flags << flag
           end
@@ -33,7 +33,7 @@ module FFI
         end
 
         def to_s
-          @flags.shelljoin
+          shelljoin(@flags)
         end
     end
 
@@ -52,9 +52,9 @@ module FFI
         @libraries = []
         @headers = []
         @functions = []
-        @cflags = Flags.new(ENV['CFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup)
-        @cxxflags = Flags.new(ENV['CXXFLAGS']&.shellsplit || DEFAULT_CFLAGS.dup)
-        @ldflags = Flags.new(ENV['LDFLAGS']&.shellsplit || DEFAULT_LDFLAGS.dup)
+        @cflags = Flags.new(shellsplit(ENV['CFLAGS']) || DEFAULT_CFLAGS.dup)
+        @cxxflags = Flags.new(shellsplit(ENV['CXXFLAGS']) || DEFAULT_CFLAGS.dup)
+        @ldflags = Flags.new(shellsplit(ENV['LDFLAGS']) || DEFAULT_LDFLAGS.dup)
         @libs = []
         @platform = Platform.system
         @exports = []
@@ -119,7 +119,7 @@ module FFI
         else
           so_flags << '-shared'
         end
-        so_flags = so_flags.shelljoin
+        so_flags = shelljoin(so_flags)
 
         out_dir = "#{@platform.arch}-#{@platform.os}"
         if @ext_dir != '.'
@@ -135,10 +135,10 @@ module FFI
         @defines += @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
         @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
 
-        cflags = (@cflags.to_a + pic_flags + iflags + @defines).shelljoin
-        cxxflags = (@cxxflags.to_a + @cflags.to_a + pic_flags + iflags + @defines).shelljoin
-        ld_flags = (@library_paths.map { |path| "-L#{path}" } + @ldflags.to_a).shelljoin
-        libs = (@libraries.map { |l| "-l#{l}" } + @libs).shelljoin
+        cflags = shelljoin(@cflags.to_a + pic_flags + iflags + @defines)
+        cxxflags = shelljoin(@cxxflags.to_a + @cflags.to_a + pic_flags + iflags + @defines)
+        ld_flags = shelljoin(@library_paths.map { |path| "-L#{path}" } + @ldflags.to_a)
+        libs = shelljoin(@libraries.map { |l| "-l#{l}" } + @libs)
 
         src_files = []
         obj_files = []
@@ -176,7 +176,7 @@ module FFI
 
         desc "Build dynamic library"
         file lib_name => obj_files do |t|
-          sh "#{ld} #{so_flags} -o #{t.name} #{t.prerequisites.shelljoin} #{ld_flags} #{libs}"
+          sh "#{ld} #{so_flags} -o #{t.name} #{shelljoin(t.prerequisites)} #{ld_flags} #{libs}"
         end
         CLEAN.include(lib_name)
 
@@ -247,7 +247,7 @@ module FFI
           File.open(path, 'w') do |f|
             f << src
           end
-          cflags = opts.shelljoin
+          cflags = shelljoin(opts)
           output = File.join(dir, 'ffi-test')
           begin
             return system "#{cc} #{cflags} -o #{output} -c #{path} > #{path}.log 2>&1"

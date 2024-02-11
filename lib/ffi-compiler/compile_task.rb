@@ -156,12 +156,12 @@ module FFI
           obj_file = obj_files[index]
           if src =~ /\.c$/
             file obj_file => [ src, File.dirname(obj_file) ] do |t|
-              sh "#{cc} #{cflags} -o #{t.name} -c #{t.prerequisites[0]}"
+              sh "#{cc} #{cflags} -o #{shellescape(t.name)} -c #{shellescape(t.prerequisites[0])}"
             end
 
           else
             file obj_file => [ src, File.dirname(obj_file) ] do |t|
-              sh "#{cxx} #{cxxflags} -o #{t.name} -c #{t.prerequisites[0]}"
+              sh "#{cxx} #{cxxflags} -o #{shellescape(t.name)} -c #{shellescape(t.prerequisites[0])}"
             end
           end
 
@@ -176,14 +176,14 @@ module FFI
 
         desc "Build dynamic library"
         file lib_name => obj_files do |t|
-          sh "#{ld} #{so_flags} -o #{t.name} #{shelljoin(t.prerequisites)} #{ld_flags} #{libs}"
+          sh "#{ld} #{so_flags} -o #{shellescape(t.name)} #{shelljoin(t.prerequisites)} #{ld_flags} #{libs}"
         end
         CLEAN.include(lib_name)
 
         @exports.each do |e|
           desc "Export #{e[:rb_file]}"
           file e[:header] => [ e[:rb_file] ] do |t|
-            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} -I#{File.dirname(t.prerequisites[0])} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{t.prerequisites[0]} #{t.name}"
+            ruby "-I#{File.join(File.dirname(__FILE__), 'fake_ffi')} -I#{File.dirname(t.prerequisites[0])} #{File.join(File.dirname(__FILE__), 'exporter.rb')} #{shellescape(t.prerequisites[0])} #{shellescape(t.name)}"
           end
 
           obj_files.each { |o| file o  => [ e[:header] ] }
@@ -250,7 +250,7 @@ module FFI
           cflags = shelljoin(opts)
           output = File.join(dir, 'ffi-test')
           begin
-            return system "#{cc} #{cflags} -o #{output} -c #{path} > #{path}.log 2>&1"
+            return system "#{cc} #{cflags} -o #{shellescape(output)} -c #{shellescape(path)} > #{shellescape(path)}.log 2>&1"
           rescue
             return false
           end

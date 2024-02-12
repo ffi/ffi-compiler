@@ -6,6 +6,7 @@ require 'tmpdir'
 require 'rbconfig'
 require_relative 'platform'
 require_relative 'shell'
+require_relative 'multi_file_task'
 
 module FFI
   module Compiler
@@ -175,8 +176,9 @@ module FFI
         obj_files.map { |f| File.dirname(f) }.sort.uniq.map { |d| directory d }
 
         desc "Build dynamic library"
-        file lib_name => obj_files do |t|
-          sh "#{ld} #{so_flags} -o #{shellescape(t.name)} #{shelljoin(t.prerequisites)} #{ld_flags} #{libs}"
+        MultiFileTask.define_task(lib_name => src_files + obj_files) do |t|
+          objs = t.prerequisites.select { |file| file.end_with?('.o') }
+          sh "#{ld} #{so_flags} -o #{shellescape(t.name)} #{shelljoin(objs)} #{ld_flags} #{libs}"
         end
         CLEAN.include(lib_name)
 

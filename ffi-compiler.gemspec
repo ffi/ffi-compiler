@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'ffi-compiler'
-  s.version = '1.2.2'
+  s.version = '1.3.0'
   s.author = 'Wayne Meissner'
   s.email = ['wmeissner@gmail.com', 'steve@advancedcontrol.com.au']
   s.cert_chain  = ['certs/stakach.pem']

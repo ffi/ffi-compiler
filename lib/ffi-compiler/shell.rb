@@ -12,7 +12,7 @@ end
 
 def shelljoin(args)
     if FFI::Platform::OS == 'windows'
-        args.reduce { |cmd, arg| cmd + ' "' + arg.gsub('"', '""') + '"' }
+        args.reduce { |cmd, arg| cmd + ' ' + shellescape(arg) }
     else
         args.shelljoin
     end

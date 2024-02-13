@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'ffi-compiler2'
-  s.version = '2.2.2'
+  s.version = '2.3.0'
   s.author = 'Dāvis'
   s.email = 'davispuh@gmail.com'
   s.homepage = 'https://gitlab.com/davispuh/ffi-compiler'

@@ -1,6 +1,8 @@
+require_relative 'lib/ffi-compiler/version'
+
 Gem::Specification.new do |s|
   s.name = 'ffi-compiler'
-  s.version = '1.3.0'
+  s.version = FFI::Compiler::VERSION
   s.author = 'Wayne Meissner'
   s.email = ['wmeissner@gmail.com', 'steve@advancedcontrol.com.au']
   s.homepage = 'https://github.com/ffi/ffi-compiler'
@@ -14,3 +16,4 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rspec'
   s.add_development_dependency 'rubygems-tasks'
 end
+

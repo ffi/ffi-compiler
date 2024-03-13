@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.license = 'Apache-2.0'
   s.required_ruby_version = '>= 1.9'
   s.add_dependency 'rake'
-  s.add_dependency 'ffi', '>= 1.0.0'
+  s.add_dependency 'ffi', '>= 1.15.5'
   s.add_development_dependency 'rspec'
   s.add_development_dependency 'rubygems-tasks'
 end

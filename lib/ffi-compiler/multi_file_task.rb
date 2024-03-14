@@ -24,6 +24,12 @@ module FFI
               super
             end
 
+            # This is here for backwards-compatibility so we have namespace-free name
+            # FileTask (which we used in past) never uses scope
+            def self.scope_name(scope, task_name)
+                task_name
+            end
+
             private
 
             def out_of_date?(timestamp)

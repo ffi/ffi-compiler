@@ -144,7 +144,7 @@ module FFI
         src_files = []
         obj_files = []
         @source_dirs.each do |dir|
-          files = FileList["#{dir}/**/*.{c,cpp}"]
+          files = FileList["#{dir}/**/*.{c,cpp,m}"]
           unless @exclude.empty?
             files.delete_if { |f| f =~ Regexp.union(*@exclude) }
           end
@@ -155,7 +155,7 @@ module FFI
         index = 0
         src_files.each do |src|
           obj_file = obj_files[index]
-          if src =~ /\.c$/
+          if src =~ /\.[cm]$/
             file obj_file => [ src, File.dirname(obj_file) ] do |t|
               sh "#{cc} #{cflags} -o #{shellescape(t.name)} -c #{shellescape(t.prerequisites[0])}"
             end

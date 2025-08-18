@@ -8,41 +8,37 @@ module FFI
       def self.find(name, start_path = nil)
         library = Platform.system.map_library_name(name)
 
-        # Try RubyGems extension_dir first (RubyGems 4.0+)
-        begin
-          if defined?(Gem::Specification)
-            begin
-              # Try to find the gemspec for the calling gem
-              spec = Gem::Specification.find_by_name(name)
-              if spec && spec.respond_to?(:extension_dir)
-                ext_dir = spec.extension_dir
-                ext_path = File.join(ext_dir, library)
-                return ext_path if File.exist?(ext_path)
-              end
-            rescue Gem::MissingSpecError
-              # Not an installed gem, fall through to legacy search
+        if defined?(Gem::Specification)
+          begin
+            spec = Gem::Specification.find_by_name(name)
+            if spec && spec.respond_to?(:extension_dir)
+              ext_dir = spec.extension_dir
+              ext_path = File.join(ext_dir, library)
+              return ext_path if File.exist?(ext_path)
             end
+          rescue Gem::MissingSpecError => e
+            raise LoadError, "Could not find gem specification for '#{name}'. Ensure the gem is installed and named correctly. (#{e.message})"
           end
-        rescue
-          # Ignore and fall back to legacy search
         end
 
-        root = false
-        Pathname.new(start_path || caller_path(caller[0])).ascend do |path|
-          Dir.glob("#{path}/**/#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library}") do |f|
-            return f
+        # Only fallback in explicit dev/test mode
+        if ENV['FFI_COMPILER_DEV_MODE'] == '1'
+          root = false
+          Pathname.new(start_path || caller_path(caller[0])).ascend do |path|
+            Dir.glob("#{path}/**/#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library}") do |f|
+              return f
+            end
+
+            Dir.glob("#{path}/**/#{library}") do |f|
+              return f
+            end
+
+            break if root
+            root = File.basename(path) == 'lib'
           end
-
-          Dir.glob("#{path}/**/#{library}") do |f|
-            return f
-          end
-
-          break if root
-
-          # Next iteration will be the root of the gem if this is the lib/ dir - stop after that
-          root = File.basename(path) == 'lib'
         end
-        raise LoadError.new("cannot find '#{name}' library")
+
+        raise LoadError, "Could not find extension for '#{name}'. Ensure the gem is installed and named correctly."
       end
 
       def self.caller_path(line = caller[0])

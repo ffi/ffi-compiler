@@ -17,6 +17,8 @@ module FFI
               return ext_path if File.exist?(ext_path)
             end
           rescue Gem::MissingSpecError => e
+            # Provide a clearer, actionable error for users/gem authors if the gem is not installed
+            # or named incorrectly, rather than letting a RubyGems error bubble up.
             raise LoadError, "Could not find gem specification for '#{name}'. Ensure the gem is installed and named correctly. (#{e.message})"
           end
         end

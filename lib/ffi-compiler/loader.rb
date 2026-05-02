@@ -11,7 +11,7 @@ module FFI
 
         # Load from modern extension fast-path when called from an active gem spec
         if defined?(Gem::Specification) &&
-           (spec = Gem::Specification.find_active_stub_by_path(library)&.spec) &&
+           (spec = Gem::Specification.find_active_stub_by_path(library)) &&
            spec.respond_to?(:extension_dir) &&
            start_path.start_with?(spec.gem_dir)
 

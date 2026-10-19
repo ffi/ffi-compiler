@@ -49,6 +49,12 @@ RSpec.describe FFI::Compiler::Loader do
           .to raise_error(LoadError, "cannot find 'foo' library")
       end
 
+      it 'accepts start_path as a Pathname' do
+        expected = touch('mygem', 'ext', library)
+
+        expect(described_class.find('foo', Pathname.new(File.join(@root, 'mygem', 'lib')))).to eq(expected)
+      end
+
       it 'raises LoadError when the library does not exist' do
         FileUtils.mkdir_p(File.join(@root, 'mygem', 'lib'))
 

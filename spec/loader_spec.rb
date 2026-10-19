@@ -64,5 +64,59 @@ RSpec.describe FFI::Compiler::Loader do
         expect(eval("FFI::Compiler::Loader.find('foo')", binding, caller_file)).to eq(expected)
       end
     end
+
+    context 'when called from an activated gem' do
+      let(:gem_home) { GemHome.new(@root) }
+
+      # Runs Loader.find in a child process with +activate+ gems activated.
+      # Returns the path found, or :load_error.
+      def find_in_gem_home(start_path, activate:)
+        result = gem_home.run(<<~RUBY, activate: activate)
+          require 'ffi-compiler/loader'
+          begin
+            print FFI::Compiler::Loader.find('foo', #{start_path.inspect})
+          rescue LoadError
+            print 'LoadError'
+          end
+        RUBY
+        result == 'LoadError' ? :load_error : result
+      end
+
+      it "finds the library in the gem's extension_dir" do
+        gem_dir = gem_home.install('mygem', ext_files: [library])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: ['mygem']))
+          .to eq(File.join(gem_home.extension_dir('mygem-1.0'), library))
+      end
+
+      it "prefers the gem's extension_dir over a copy in the gem directory" do
+        gem_dir = gem_home.install('mygem', ext_files: [library], gem_files: ["ext/#{arch_dir}/#{library}"])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: ['mygem']))
+          .to eq(File.join(gem_home.extension_dir('mygem-1.0'), library))
+      end
+
+      it "falls back to the gem directory when the extension_dir lacks the library" do
+        gem_dir = gem_home.install('mygem', ext_files: ['other.so'], gem_files: ["ext/#{arch_dir}/#{library}"])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: ['mygem']))
+          .to eq(File.join(gem_dir, 'ext', arch_dir, library))
+      end
+
+      it "does not return a library from another gem's extension_dir" do
+        gem_home.install('other', ext_files: [library])
+        gem_dir = gem_home.install('mygem', gem_files: ["ext/#{library}"])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: %w[other mygem]))
+          .to eq(File.join(gem_dir, 'ext', library))
+      end
+
+      it "raises LoadError when only another gem's extension_dir has the library" do
+        gem_home.install('other', ext_files: [library])
+        gem_dir = gem_home.install('mygem')
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: %w[other mygem])).to eq(:load_error)
+      end
+    end
   end
 end

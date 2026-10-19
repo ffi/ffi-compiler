@@ -10,11 +10,7 @@ module FFI
         start_path ||= caller_path(caller[0])
 
         # Load from modern extension fast-path when called from an active gem spec
-        if defined?(Gem::Specification) &&
-           (spec = Gem::Specification.find_active_stub_by_path(library)) &&
-           spec.respond_to?(:extension_dir) &&
-           start_path.start_with?(spec.gem_dir)
-
+        if (spec = active_spec_containing(start_path)) && spec.respond_to?(:extension_dir)
           ext_path = File.join(spec.extension_dir, library)
           return ext_path if File.exist?(ext_path)
         end
@@ -37,6 +33,17 @@ module FFI
         end
         raise LoadError.new("cannot find '#{name}' library")
       end
+
+      def self.active_spec_containing(path)
+        return unless defined?(Gem) && Gem.respond_to?(:loaded_specs)
+
+        path = path.to_s
+        Gem.loaded_specs.each_value.find do |spec|
+          gem_dir = spec.gem_dir
+          path == gem_dir || path.start_with?(gem_dir + File::SEPARATOR)
+        end
+      end
+      private_class_method :active_spec_containing
 
       def self.caller_path(line = caller[0])
         if FFI::Platform::OS == 'windows'

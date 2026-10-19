@@ -123,6 +123,30 @@ RSpec.describe FFI::Compiler::Loader do
 
         expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: %w[other mygem])).to eq(:load_error)
       end
+
+      it "finds the library in its own extension_dir when another gem's extension_dir has one too" do
+        gem_home.install('another', ext_files: [library])
+        gem_dir = gem_home.install('mygem', ext_files: [library])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: %w[another mygem]))
+          .to eq(File.join(gem_home.extension_dir('mygem-1.0'), library))
+      end
+
+      it 'finds the library when start_path is the gem directory itself' do
+        gem_dir = gem_home.install('mygem', ext_files: [library], gem_files: ["ext/#{library}"])
+
+        expect(find_in_gem_home(gem_dir, activate: ['mygem']))
+          .to eq(File.join(gem_home.extension_dir('mygem-1.0'), library))
+      end
+
+      it 'does not match a gem whose directory is only a prefix of start_path' do
+        # mygem-1.0 is a string prefix of mygem-1.0-2, the directory of gem "mygem-1.0" version 2
+        gem_home.install('mygem', ext_files: [library])
+        gem_dir = gem_home.install('mygem-1.0', version: '2', gem_files: ["ext/#{library}"])
+
+        expect(find_in_gem_home(File.join(gem_dir, 'lib'), activate: %w[mygem mygem-1.0]))
+          .to eq(File.join(gem_dir, 'ext', library))
+      end
     end
   end
 end

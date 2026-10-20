@@ -39,7 +39,7 @@ module FFI
 
         path = path.to_s
         Gem.loaded_specs.each_value.find do |spec|
-          gem_dir = spec.gem_dir
+          gem_dir = spec.full_gem_path # not #gem_dir: Bundler's stub specs read the whole gemspec from disk for it
           path == gem_dir || path.start_with?(gem_dir + File::SEPARATOR)
         end
       end

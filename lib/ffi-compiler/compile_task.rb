@@ -134,7 +134,7 @@ module FFI
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
         @defines += @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
-        @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.sub(/\./, '_')}=1" }
+        @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.tr_s('^A-Z0-9_', '_')}=1" }
 
         cflags = shelljoin(@cflags.to_a + pic_flags + iflags + @defines)
         cxxflags = shelljoin(@cxxflags.to_a + @cflags.to_a + pic_flags + iflags + @defines)

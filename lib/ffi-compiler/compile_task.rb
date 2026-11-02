@@ -73,12 +73,7 @@ module FFI
       end
 
       def have_func?(func)
-        main = <<-C_FILE
-        extern void #{func}();
-        int main(int argc, char **argv) { #{func}(); return 0; }
-        C_FILE
-
-        if try_compile(main)
+        if try_link(probe_source(func), *link_flags)
           @functions << func
           return true
         end
@@ -90,15 +85,15 @@ module FFI
       end
 
       def have_library?(libname, *paths)
-        try_library(libname, paths: @library_paths) || try_library(libname, paths: paths)
+        try_library(libname, paths: paths)
       end
-      
-      def have_library(lib, func = nil, headers = nil, &b)
-        try_library(lib, function: func, headers: headers, paths: @library_paths)
+
+      def have_library(lib, func = nil, headers = nil)
+        try_library(lib, function: func, headers: headers)
       end
-      
+
       def find_library(lib, func, *paths)
-        try_library(lib, function: func, paths: @library_paths) || try_library(libname, function: func, paths: paths)
+        try_library(lib, function: func, paths: paths)
       end
 
       def export(rb_file)
@@ -133,8 +128,7 @@ module FFI
         lib_name = File.join(out_dir, Platform.system.map_library_name(@name))
 
         iflags = @include_paths.uniq.map { |p| "-I#{p}" }
-        @defines += @functions.uniq.map { |f| "-DHAVE_#{f.upcase}=1" }
-        @defines += @headers.uniq.map { |h| "-DHAVE_#{h.upcase.tr_s('^A-Z0-9_', '_')}=1" }
+        @defines += (@functions + @headers).uniq.map { |name| "-DHAVE_#{macro_name(name)}=1" }
 
         cflags = shelljoin(@cflags.to_a + pic_flags + iflags + @defines)
         cxxflags = shelljoin(@cxxflags.to_a + @cflags.to_a + pic_flags + iflags + @defines)
@@ -200,10 +194,7 @@ module FFI
       end
 
       def try_header(header, paths)
-        main = <<-C_FILE
-          #include <#{header}>
-          int main(int argc, char **argv) { return 0; }
-        C_FILE
+        main = probe_source(nil, header)
 
         if paths.empty? && try_compile(main)
           @headers << header
@@ -220,42 +211,57 @@ module FFI
         false
       end
 
+      # The first try needs no extra path: link_flags already passes every known library path.
+      def try_library(libname, function: nil, headers: nil, paths: [])
+        main = probe_source(function, headers)
 
-      def try_library(libname, options = {})
-        func = options[:function] || 'main'
-        paths = options[:paths] || ''
-        main = <<-C_FILE
-        #{(options[:headers] || []).map {|h| "#include <#{h}>"}.join('\n')}
-        extern int #{func}();
-        int main() { return #{func}(); }
-        C_FILE
-
-        if paths.empty? && try_compile(main)
-          @libraries << libname
-          return true
-        end
-
-        paths.each do |path|
-          if try_compile(main, "-L#{path}", "-l#{libname}")
-            @library_paths << path
-            @libraries << libname
+        [nil, *paths].each do |path|
+          if try_link(main, *("-L#{path}" if path), *link_flags(libname))
+            @library_paths << path if path
+            @libraries.unshift(libname)
+            return true
           end
         end
+        false
+      end
+
+      # Without headers, the probe declares the function itself. Under C23 that declaration
+      # can clash with a builtin prototype, which compilers only warn about.
+      def probe_source(function = nil, headers = nil)
+        includes = Array(headers).map { |header| "#include <#{header}>\n" }.join
+        return "#{includes}int main(void) { return 0; }\n" if function.nil? || function == 'main'
+
+        declaration = "extern void #{function}();\n" unless headers
+        "#{includes}#{declaration}int main(void) { void (*volatile probe)() = (void (*)())#{function}; return !probe; }\n"
+      end
+
+      # Like mkmf, each new library goes before those found earlier, which it may depend on:
+      # GNU ld resolves static archives left to right. -Werror is dropped because a probe
+      # declaring a builtin (strlen) always draws a warning.
+      def link_flags(new_library = nil)
+        @cflags.to_a.grep_v(/\A-Werror/) +
+          @include_paths.map { |path| "-I#{path}" } +
+          @library_paths.map { |path| "-L#{path}" } +
+          @ldflags.to_a +
+          [*new_library, *@libraries].map { |library| "-l#{library}" } +
+          @libs
+      end
+
+      # Same rule as mkmf's String#tr_cpp, so HAVE_ macros match those of a C extension.
+      def macro_name(name)
+        name.strip.upcase.tr_s('^A-Z0-9_*', '_').tr_s('*', 'P')
       end
 
       def try_compile(src, *opts)
+        try_link(src, '-c', *opts)
+      end
+
+      def try_link(src, *opts)
         Dir.mktmpdir do |dir|
           path = File.join(dir, 'ffi-test.c')
-          File.open(path, 'w') do |f|
-            f << src
-          end
-          cflags = shelljoin(opts)
+          File.write(path, src)
           output = File.join(dir, 'ffi-test')
-          begin
-            return system "#{cc} #{cflags} -o #{shellescape(output)} -c #{shellescape(path)} > #{shellescape(path)}.log 2>&1"
-          rescue
-            return false
-          end
+          system "#{cc} -o #{shellescape(output)} #{shellescape(path)} #{shelljoin(opts)} > #{shellescape(path)}.log 2>&1"
         end
       end
 

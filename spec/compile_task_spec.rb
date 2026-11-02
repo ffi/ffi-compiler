@@ -6,15 +6,15 @@ RSpec.describe FFI::Compiler::CompileTask do
   around do |example|
     Dir.mktmpdir('ffi-compiler-compile-task') do |dir|
       Dir.chdir(dir) do
-        rake, Rake.application = Rake.application, Rake::Application.new
-        verbose, Rake::FileUtilsExt.verbose_flag = Rake::FileUtilsExt.verbose_flag, false
-        clean, clobber = CLEAN.dup, CLOBBER.dup
-        example.run
-      ensure
-        Rake.application = rake
-        Rake::FileUtilsExt.verbose_flag = verbose
-        CLEAN.replace(clean)
-        CLOBBER.replace(clobber)
+        Rake.with_application do
+          verbose, Rake::FileUtilsExt.verbose_flag = Rake::FileUtilsExt.verbose_flag, false
+          clean, clobber = CLEAN.dup, CLOBBER.dup
+          example.run
+        ensure
+          Rake::FileUtilsExt.verbose_flag = verbose
+          CLEAN.replace(clean)
+          CLOBBER.replace(clobber)
+        end
       end
     end
   end

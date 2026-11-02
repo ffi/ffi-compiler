@@ -18,12 +18,13 @@ module FFI
         # Try to find the library in the legacy lib path, passed start_path or local folder
         root = false
         Pathname.new(start_path).ascend do |path|
+          # Windows' LoadLibrary doesn't resolve a relative path against the working directory
           Dir.glob("#{path}/**/#{FFI::Platform::ARCH}-#{FFI::Platform::OS}/#{library}") do |f|
-            return f
+            return File.expand_path(f)
           end
 
           Dir.glob("#{path}/**/#{library}") do |f|
-            return f
+            return File.expand_path(f)
           end
 
           break if root

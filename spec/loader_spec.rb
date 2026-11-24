@@ -55,6 +55,22 @@ RSpec.describe FFI::Compiler::Loader do
         expect(described_class.find('foo', Pathname.new(File.join(@root, 'mygem', 'lib')))).to eq(expected)
       end
 
+      it 'returns an absolute path when start_path is relative' do
+        expected = touch('mygem', 'ext', arch_dir, library)
+
+        Dir.chdir(@root) do
+          expect(described_class.find('foo', './mygem/ext')).to eq(expected)
+        end
+      end
+
+      it 'does not expand a relative start_path starting with ~ as a home directory' do
+        expected = touch('~mygem', 'ext', library)
+
+        Dir.chdir(@root) do
+          expect(described_class.find('foo', '~mygem/ext')).to eq(expected)
+        end
+      end
+
       it 'raises LoadError when the library does not exist' do
         FileUtils.mkdir_p(File.join(@root, 'mygem', 'lib'))
 
